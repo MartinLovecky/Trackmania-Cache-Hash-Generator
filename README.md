@@ -43,18 +43,15 @@ It supports exporting files individually or packing them into a hashed ZIP archi
 **Example output filename:**
 <REVERSED_MD5>_Skins%5cMediaTracker%5cImages%5cmyimage.png
 
-
 ---
 
 ### ZIP Mode
 
 - Each file inside the ZIP uses its **own reversed MD5 filename**
-- The ZIP archive itself is hashed after creation
-- The ZIP filename is generated from the hash of its contents
+- The ZIP archive itself is not hashed after creation
 
 **Example ZIP filename:**
-<ZIP_REVERSED_MD5>_Skins%5cStadium%5cMod%5cMyPack.zip
-
+MyPack.zip
 
 ---
 

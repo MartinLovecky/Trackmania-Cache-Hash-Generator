@@ -126,12 +126,11 @@ def save_single_mode():
 def save_pack_mode():
     """
     Pack all processed files into a ZIP file.
-    The ZIP itself is renamed using a reversed MD5 hash.
+    The ZIP file itself is not hashed; internal files use hash-based names.
     """
-    zip_type = zip_type_var.get()
-    base_path = PATH_MAP[zip_type]
-
+    base_path = PATH_MAP[file_type_var.get()]
     zip_name = simpledialog.askstring("ZIP name", "Enter ZIP base name:")
+
     if not zip_name:
         return
 
@@ -141,11 +140,8 @@ def save_pack_mode():
         for original, line in generated_files:
             z.write(original, arcname=line)
 
-    # Hash the final ZIP content
     zip_bytes = buffer.getvalue()
-    _, zip_rev = md5_and_reverse_bytes(zip_bytes)
-
-    final_name = f"{zip_rev}_{base_path}{zip_name}.zip"
+    final_name = f"{zip_name}.zip"
 
     out = filedialog.asksaveasfilename(
         initialfile=final_name,
@@ -162,7 +158,6 @@ def save_pack_mode():
     save_last_dir(os.path.dirname(out))
     messagebox.showinfo("Done", "Packed ZIP created.")
     clear_all()
-
 
 def save_output():
     """
@@ -206,10 +201,7 @@ type_frame = tk.LabelFrame(root, text="Type")
 type_frame.pack(fill="x", padx=15, pady=5)
 
 file_type_var = tk.StringVar(value="images")
-zip_type_var = tk.StringVar(value="mods")
-
 file_type_frame = tk.Frame(type_frame)
-zip_type_frame = tk.Frame(type_frame)
 
 for k in PATH_MAP:
     tk.Radiobutton(
@@ -219,22 +211,13 @@ for k in PATH_MAP:
         value=k
     ).pack(side="left", padx=8)
 
-tk.Radiobutton(zip_type_frame, text="Mods", variable=zip_type_var, value="mods").pack(side="left", padx=10)
-tk.Radiobutton(zip_type_frame, text="Advertisement", variable=zip_type_var, value="advert").pack(side="left", padx=10)
-
 file_type_frame.pack(anchor="w")
-zip_type_frame.pack_forget()
 
 def update_type_ui(*_):
     """
-    Switch type selection UI depending on output mode.
+    The full type selector is always visible.
     """
-    if output_mode.get() == "single":
-        zip_type_frame.pack_forget()
-        file_type_frame.pack(anchor="w")
-    else:
-        file_type_frame.pack_forget()
-        zip_type_frame.pack(anchor="w")
+    pass
 
 output_mode.trace_add("write", update_type_ui)
 
