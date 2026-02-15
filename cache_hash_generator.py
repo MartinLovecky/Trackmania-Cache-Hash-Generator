@@ -1,5 +1,7 @@
 import os
 import io
+import subprocess
+import sys
 import hashlib
 import zipfile
 import tkinter as tk
@@ -31,6 +33,44 @@ PATH_MAP = {
 generated_files = []
 
 # ============================================================
+# Config handling
+# ============================================================
+
+def load_config():
+    """
+    Load config values from CONFIG_FILE.
+    Returns dict with keys: save_path, cache_path
+    """
+    config = {"save_path": None, "cache_path": None}
+
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    if os.path.isdir(v):
+                        config[k] = v
+    return config
+
+def save_config_value(key: str, value: str):
+    """
+    Update only one config value while preserving others.
+    """
+    config = load_config()
+    config[key] = value
+
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        for k, v in config.items():
+            if v:
+                f.write(f"{k}={v}\n")
+
+def get_save_dir():
+    return load_config().get("save_path")
+
+def get_cache_dir():
+    return load_config().get("cache_path")
+
+# ============================================================
 # Utility functions
 # ============================================================
 
@@ -44,7 +84,6 @@ def md5_and_reverse_bytes(data: bytes):
     rev = bytes.fromhex(md5)[::-1].hex().upper()
     return md5, rev
 
-
 def md5_and_reverse_file(path: str):
     """
     Read a file from disk and return its MD5 and reversed MD5.
@@ -52,32 +91,46 @@ def md5_and_reverse_file(path: str):
     with open(path, "rb") as f:
         return md5_and_reverse_bytes(f.read())
 
-
 def encode_name(name: str) -> str:
     """
     URL-encode filename only if it contains non-ASCII characters.
     """
     return quote(name, safe="") if any(ord(c) > 127 for c in name) else name
 
+def open_folder(path):
+    """
+    Open folder in system file manager (Windows/Linux/macOS).
+    """
+    if not os.path.isdir(path):
+        return
 
-def load_last_dir():
-    """
-    Load the last used directory from disk (if valid).
-    """
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            p = f.read().strip()
-            if os.path.isdir(p):
-                return p
-    return None
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(path)
+        elif sys.platform.startswith("darwin"):
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+    except Exception as e:
+        messagebox.showerror("Error", f"Cannot open folder:\n{e}")
 
+def open_or_choose_cache():
+    """
+    Open cache if known, otherwise ask user once.
+    """
+    path = get_cache_dir()
 
-def save_last_dir(path: str):
-    """
-    Save the last used directory to disk.
-    """
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        f.write(path)
+    if path and os.path.isdir(path):
+        open_folder(path)
+        return
+
+    folder = filedialog.askdirectory(title="Select Trackmania Cache Folder")
+    if not folder:
+        return
+
+    save_config_value("cache_path", folder)
+    messagebox.showinfo("Cache folder saved", folder)
+    open_folder(folder)
 
 # ============================================================
 # Core processing logic
@@ -101,13 +154,12 @@ def process_files(files):
         generated_files.append((file, line))
         output.insert(tk.END, line + "\n")
 
-
 def save_single_mode():
     """
     Save each processed file individually using
     its generated cache filename.
     """
-    folder = filedialog.askdirectory(initialdir=load_last_dir())
+    folder = filedialog.askdirectory(initialdir=get_save_dir())
     if not folder:
         return
 
@@ -118,19 +170,16 @@ def save_single_mode():
         with open(original, "rb") as src, open(out_path, "wb") as dst:
             dst.write(src.read())
 
-    save_last_dir(folder)
+    save_config_value("save_path", folder)
     messagebox.showinfo("Done", "Files saved successfully.")
     clear_all()
-
 
 def save_pack_mode():
     """
     Pack all processed files into a ZIP file.
     The ZIP file itself is not hashed; internal files use hash-based names.
     """
-    base_path = PATH_MAP[file_type_var.get()]
     zip_name = simpledialog.askstring("ZIP name", "Enter ZIP base name:")
-
     if not zip_name:
         return
 
@@ -141,21 +190,21 @@ def save_pack_mode():
             z.write(original, arcname=line)
 
     zip_bytes = buffer.getvalue()
-    final_name = f"{zip_name}.zip"
 
     out = filedialog.asksaveasfilename(
-        initialfile=final_name,
+        initialfile=f"{zip_name}.zip",
         defaultextension=".zip",
         filetypes=[("ZIP files", "*.zip")],
-        initialdir=load_last_dir()
+        initialdir=get_save_dir()
     )
+
     if not out:
         return
 
     with open(out, "wb") as f:
         f.write(zip_bytes)
 
-    save_last_dir(os.path.dirname(out))
+    save_config_value("save_path", os.path.dirname(out))
     messagebox.showinfo("Done", "Packed ZIP created.")
     clear_all()
 
@@ -171,7 +220,6 @@ def save_output():
         save_single_mode()
     else:
         save_pack_mode()
-
 
 def clear_all():
     """
@@ -213,14 +261,6 @@ for k in PATH_MAP:
 
 file_type_frame.pack(anchor="w")
 
-def update_type_ui(*_):
-    """
-    The full type selector is always visible.
-    """
-    pass
-
-output_mode.trace_add("write", update_type_ui)
-
 # Buttons
 btn_frame = tk.Frame(root)
 btn_frame.pack(pady=10)
@@ -236,6 +276,7 @@ def select_files():
 tk.Button(btn_frame, text="Select Files", command=select_files, width=14).pack(side="left", padx=5)
 tk.Button(btn_frame, text="Save", command=save_output, width=14).pack(side="left", padx=5)
 tk.Button(btn_frame, text="Clear", command=clear_all, width=12).pack(side="left", padx=5)
+tk.Button(btn_frame, text="Open Cache", command=open_or_choose_cache, width=14).pack(side="left", padx=5)
 tk.Button(btn_frame, text="Close", command=root.destroy, width=10).pack(side="left", padx=5)
 
 # Output display
