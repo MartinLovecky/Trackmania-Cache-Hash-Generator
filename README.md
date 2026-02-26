@@ -1,5 +1,8 @@
 # Cache Hash Generator
 
+**Version 2.0.0 is a complete rewrite and not backward compatible.**  
+The old version is available in the [`legacy-v1`](https://github.com/MartinLovecky/Trackmania-Cache-Hash-Generator/tree/legacy-v1) branch or via tag [`v1-final`](https://github.com/MartinLovecky/Trackmania-Cache-Hash-Generator/releases/tag/v1-final).
+
 A small Tkinter-based utility for generating **Trackmania cache-style filenames** using **reversed MD5 hashes**.  
 It supports exporting files individually or packing them into a hashed ZIP archive.
 
