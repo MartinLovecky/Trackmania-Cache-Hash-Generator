@@ -21,34 +21,68 @@ import queue
 # - Generates reversed-MD5 cache filenames based on file content
 # ============================================================
 
-CONFIG_FILE = "last_dir.txt"
+APP_NAME = "CacheHashGenerator"
+
 IGNORED_EXTENSIONS = {".txt", ".loc"}
 processed_files = []
 processing_active = False
 ui_queue = queue.Queue()
 
 # ============================================================
-# CONFIG HANDLING
+# CONFIG HANDLING CROSS PLATFORM
 # ============================================================
+
+def get_config_dir():
+    # Windows
+    if sys.platform.startswith("win"):
+        base = os.getenv("APPDATA")
+
+    # macOS
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+
+    # Linux / Unix (XDG standard)
+    else:
+        base = os.getenv("XDG_CONFIG_HOME", Path.home() / ".config")
+
+    cfg = Path(base) / APP_NAME
+    cfg.mkdir(parents=True, exist_ok=True)
+    return cfg
+
+CONFIG_DIR = get_config_dir()
+CONFIG_FILE = CONFIG_DIR / "last_dir.txt"
 
 def load_config():
     config = {"save_path": None, "base_path": None, "cache_path": None}
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                if "=" in line:
-                    k, v = line.strip().split("=", 1)
-                    if os.path.isdir(v):
-                        config[k] = v
+
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                for line in f:
+                    if "=" in line:
+                        k, v = line.strip().split("=", 1)
+                        if os.path.isdir(v):
+                            config[k] = v
+        except Exception:
+            pass
+
     return config
 
 def save_config_value(key, value):
-    config = load_config()
-    config[key] = value
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        for k, v in config.items():
-            if v:
-                f.write(f"{k}={v}\n")
+    try:
+        config = load_config()
+        config[key] = value
+
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            for k, v in config.items():
+                if v:
+                    f.write(f"{k}={v}\n")
+
+    except PermissionError:
+        messagebox.showerror(
+            "Permission Error",
+            "Cannot save configuration file."
+        )
 
 def get_save_dir():
     return load_config().get("save_path")
@@ -87,7 +121,6 @@ def save_output():
 
     saved = 0
 
-    # FIX: unpack only 3 items per tuple
     for original, cache_path, _ in processed_files:
         if cache_path.startswith("ERROR"):
             continue
@@ -235,7 +268,6 @@ def process_ui_queue():
             elif msg["type"] == "done":
                 process_button.config(state="normal")
                 save_button.config(state="normal")
-                stop_button.config(state="disabled")
     except queue.Empty:
         pass
     root.after(50, process_ui_queue)
@@ -253,7 +285,6 @@ def start_processing():
     processing_active = True
     process_button.config(state="disabled")
     save_button.config(state="disabled")
-    stop_button.config(state="normal")
     thread = threading.Thread(target=process_folder, args=(base_folder,), daemon=True)
     thread.start()
 
@@ -273,12 +304,16 @@ root.geometry("900x650")
 btn_frame = tk.Frame(root)
 btn_frame.pack(pady=10)
 
-tk.Button(btn_frame, text="Open Cache", command=open_or_choose_cache, width=14).pack(side="left", padx=5)
-tk.Button(btn_frame, text="Process Folder", command=start_processing, width=14).pack(side="left", padx=5)
-tk.Button(btn_frame, text="Save", command=save_output, width=10, state="disabled").pack(side="left", padx=5)
-tk.Button(btn_frame, text="Clear", command=clear_all, width=10).pack(side="left", padx=5)
-tk.Button(btn_frame, text="Close", command=root.destroy, width=10).pack(side="left", padx=5)
-
+process_button = tk.Button(btn_frame, text="Process Folder", command=start_processing, width=14)
+process_button.pack(side="left", padx=5)
+open_cache_button = tk.Button(btn_frame, text="fi", command=open_or_choose_cache, width=14)
+open_cache_button.pack(side="left", padx=5)
+save_button = tk.Button(btn_frame, text="Save", command=save_output, width=10, state="disabled")
+save_button.pack(side="left", padx=5)
+clear_button = tk.Button(btn_frame, text="Clear", command=clear_all, width=10)
+clear_button.pack(side="left", padx=5)
+close_button = tk.Button(btn_frame, text="Close", command=root.destroy, width=10)
+close_button.pack(side="left", padx=5)
 
 status_label = tk.Label(root, text="Ready", anchor="w")
 status_label.pack(fill="x", padx=15)

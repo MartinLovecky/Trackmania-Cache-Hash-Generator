@@ -1,2 +1,0 @@
-save_path=/home/yuha/Downloads
-base_path=/home/yuha/Downloads/The Trump Card - TM Archive Media Pack
