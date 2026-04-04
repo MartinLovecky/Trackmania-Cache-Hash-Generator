@@ -15,7 +15,7 @@ import threading
 import queue
 
 # ============================================================
-# Cache Hash Generator (No Cache Folder Logic)
+# Cache Hash Generator
 # ============================================================
 
 APP_NAME = "CacheHashGenerator"
@@ -29,7 +29,7 @@ input_is_zip = False
 start_time = 0
 
 # ============================================================
-# CONFIG HANDLING (only base and save paths)
+# CONFIG HANDLING
 # ============================================================
 
 def get_config_dir():
